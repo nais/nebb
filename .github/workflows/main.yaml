@@ -1,0 +1,35 @@
+name: Build nebb
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'CODEOWNERS'
+      - 'LICENSE'
+      - '.gitignore'
+jobs:
+  build:
+    name: Build all the things
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # ratchet:actions/checkout@v3
+      - name: Generate Docker image tag
+        id: dockertag
+        run: echo "::set-output name=docker_img::ghcr.io/${{ github.repository }}:$(date +'%d%m%g')-$(git rev-parse --short HEAD)"
+      - name: Install cosign
+        uses: sigstore/cosign-installer@b3413d484cc23cf8778c3d2aa361568d4eb54679 # ratchet:sigstore/cosign-installer@main
+        with:
+          cosign-release: 'v1.9.0'
+      - name: Verify distroless base image
+        run: cosign verify --key distroless.pub gcr.io/distroless/static-debian11:nonroot
+      - name: Login to GitHub Docker Registry
+        uses: docker/login-action@49ed152c8eca782a232dede0303416e8f356c37b # ratchet:docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build the Docker image
+        uses: docker/build-push-action@c84f38281176d4c9cdb1626ffafcd6b3911b5d94 # ratchet:docker/build-push-action@v3
+        with:
+          context: .
+          push: false
+          tags: ${{ steps.dockertag.outputs.docker_img }}
