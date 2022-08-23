@@ -1,12 +1,44 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/gomodule/redigo/redis"
 	rg "github.com/redislabs/redisgraph-go"
 	"log"
 	"os"
 	"time"
 )
+
+func (d *Datastore) Upsert(app App) error {
+	for _, lib := range app.Libs {
+		params := make(map[string]interface{})
+		params["appname"] = app.Name
+		params["appversion"] = app.Version
+		params["libname"] = lib.Name
+		params["libversion"] = lib.Version
+		_, err := d.graph.ParameterizedQuery(`MERGE (a:APP {name: $appname, version: $appversion}) MERGE (l:LIBRARY {name: $libname, version: $libversion}) MERGE (a)-[u:USES]->(l)`, params)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (d *Datastore) AppsUsing(lib Library) ([]App, error) {
+	params := make(map[string]interface{})
+	params["libname"] = lib.Name
+	params["libversion"] = lib.Version
+	result, err := d.graph.ParameterizedQuery(`Match (a:APP) -[u:USES]->(l:LIBRARY {name: $libname, version: $libversion}) RETURN a.name, a.version`, params)
+	if err != nil {
+		return nil, err
+	}
+	apps := make([]App, 0)
+	for result.Next() {
+		r := result.Record()
+		apps = append(apps, toApp(r))
+	}
+	return apps, nil
+}
 
 type Datastore struct {
 	graph rg.Graph
@@ -65,17 +97,8 @@ func NewDatastore() (*Datastore, error) {
 	}, nil
 }
 
-func (d *Datastore) Upsert(app App) error {
-	for _, lib := range app.Libs {
-		params := make(map[string]interface{})
-		params["appname"] = app.Name
-		params["appversion"] = app.Version
-		params["libname"] = lib.Name
-		params["libversion"] = lib.Version
-		_, err := d.graph.ParameterizedQuery(`MERGE (a:APP {name: $appname, version: $appversion}) MERGE (l:LIBRARY {name: $libname, version: $libversion}) MERGE (a)-[u:USES]->(l)`, params)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func toApp(r *rg.Record) App {
+	name, _ := r.Get("a.name")
+	version, _ := r.Get("a.version")
+	return App{Name: fmt.Sprintf("%v", name), Version: fmt.Sprintf("%v", version), Libs: nil}
 }
