@@ -4,7 +4,7 @@ WORKDIR /go/src/nebb
 COPY . .
 
 RUN go mod download
-RUN make nebb test
+RUN make nebb testall
 
 FROM gcr.io/distroless/static-debian11:nonroot
 COPY --from=build /go/src/nebb/bin/nebb /
