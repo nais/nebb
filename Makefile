@@ -9,3 +9,6 @@ vet:
 
 test: fmt vet
 	go test ./... -coverprofile cover.out -short
+
+testall: fmt vet
+	go test ./... -coverprofile cover.out
