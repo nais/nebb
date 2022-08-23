@@ -1,12 +1,4 @@
-FROM golang:1.19 as build
-
-WORKDIR /go/src/nebb
-COPY . .
-
-RUN go mod download
-RUN make nebb testall
-
 FROM gcr.io/distroless/static-debian11:nonroot
-COPY --from=build /go/src/nebb/bin/nebb /
+COPY ./bin/nebb /
 USER nonroot
 CMD ["/nebb"]
